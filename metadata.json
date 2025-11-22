@@ -1,0 +1,5 @@
+{
+  "name": "Makanika",
+  "description": "A neo-brutalist auto repair shop management app for Uganda, allowing mechanics to track jobs and customers to view real-time repair status and estimates.",
+  "requestFramePermissions": []
+}
