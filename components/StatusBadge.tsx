@@ -9,10 +9,10 @@ interface StatusBadgeProps {
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, isActive = true }) => {
   const getStatusColor = (s: JobStatus) => {
     switch (s) {
-      case JobStatus.PENDING: return 'bg-gray-200';
-      case JobStatus.DIAGNOSTICS: return 'bg-mk-yellow';
-      case JobStatus.PARTS: return 'bg-white';
-      case JobStatus.FIXING: return 'bg-black text-white';
+      case JobStatus.CHECKED_IN: return 'bg-gray-200';
+      case JobStatus.DIAGNOSING: return 'bg-mk-yellow';
+      case JobStatus.WAITING_PARTS: return 'bg-orange-300';
+      case JobStatus.REPAIRING: return 'bg-mk-blue text-white';
       case JobStatus.READY: return 'bg-mk-green';
       default: return 'bg-white';
     }
