@@ -42,16 +42,11 @@ export default function App() {
   const [partsLoading, setPartsLoading] = useState(false);
   const [partsSearchQuery, setPartsSearchQuery] = useState('');
   
-  // Load from localStorage or use initial data
-  const [jobs, setJobs] = useState<Job[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.JOBS);
-    return saved ? JSON.parse(saved) : INITIAL_JOBS;
-  });
+  // Jobs start empty - loaded from backend
+  const [jobs, setJobs] = useState<Job[]>([]);
   
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOMERS;
-  });
+  // Customers managed locally for quick lookup
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
   const [smsNotifications, setSmsNotifications] = useState<SMSNotification[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.SMS);
@@ -70,15 +65,7 @@ export default function App() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [showPartsPanel, setShowPartsPanel] = useState(false);
 
-  // Persist to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.JOBS, JSON.stringify(jobs));
-  }, [jobs]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
-  }, [customers]);
-
+  // Only persist SMS notifications to localStorage (jobs come from backend)
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SMS, JSON.stringify(smsNotifications));
   }, [smsNotifications]);
@@ -108,13 +95,44 @@ export default function App() {
     logout();
   };
 
-  // Load spare parts from API when authenticated
+  // Load data from API when authenticated (Mechanic)
   useEffect(() => {
     if (isAuthenticated) {
       loadSpareParts();
       loadLowStockAlerts();
+      loadJobsFromBackend();
     }
   }, [isAuthenticated]);
+
+  // Load all jobs from backend
+  const loadJobsFromBackend = async () => {
+    try {
+      const backendJobs = await jobsAPI.getAll();
+      if (backendJobs && backendJobs.length > 0) {
+        const convertedJobs: Job[] = backendJobs.map((bj: any) => ({
+          id: bj.job_number || bj.id.toString(),
+          backendId: bj.id,
+          customerName: bj.customer_name,
+          customerPhone: bj.customer_phone,
+          motorcycleModel: bj.vehicle_name,
+          plateNumber: bj.motorcycle_numberplate,
+          issueType: bj.problem_description?.split(':')[0] || 'Repair',
+          issueDescription: bj.problem_description || '',
+          status: bj.status as JobStatus,
+          estimatedCost: bj.estimated_cost || 0,
+          estimatedPickup: bj.estimated_completion || 'TBD',
+          entryDate: bj.created_at,
+          costItems: [],
+          logs: [],
+          visuals: []
+        }));
+        setJobs(convertedJobs);
+        console.log('✅ Loaded', convertedJobs.length, 'jobs from backend');
+      }
+    } catch (error) {
+      console.error('Failed to load jobs from backend:', error);
+    }
+  };
 
   const loadSpareParts = async () => {
     setPartsLoading(true);
