@@ -634,11 +634,62 @@ export default function App() {
   );
 
   const LandingView = () => {
-    const handlePhoneSearch = (phone: string) => {
+    const [isSearching, setIsSearching] = useState(false);
+
+    const handlePhoneSearch = async (phone: string) => {
       const normalizedPhone = phone.replace(/\s/g, '');
+      setIsSearching(true);
+      
+      try {
+        // Try to fetch from backend first
+        const backendJobs = await jobsAPI.getByPhone(normalizedPhone);
+        
+        if (backendJobs && backendJobs.length > 0) {
+          // Convert backend jobs to our format and merge with local
+          const convertedJobs: Job[] = backendJobs.map((bj: any) => ({
+            id: bj.job_number || bj.id.toString(),
+            backendId: bj.id,
+            customerName: bj.customer_name,
+            customerPhone: bj.customer_phone,
+            motorcycleModel: bj.vehicle_name,
+            plateNumber: bj.motorcycle_numberplate,
+            issueType: bj.problem_description?.split(':')[0] || 'Repair',
+            issueDescription: bj.problem_description || '',
+            status: bj.status as JobStatus,
+            estimatedCost: bj.estimated_cost || 0,
+            estimatedPickup: bj.estimated_completion || 'TBD',
+            entryDate: bj.created_at,
+            costItems: [],
+            logs: [],
+            visuals: []
+          }));
+          
+          // Update local state with backend data
+          setJobs(prevJobs => {
+            const existingIds = new Set(prevJobs.map(j => j.backendId));
+            const newJobs = convertedJobs.filter(j => !existingIds.has(j.backendId));
+            return [...newJobs, ...prevJobs];
+          });
+          
+          setSelectedCustomerPhone(normalizedPhone);
+          if (convertedJobs.length === 1) {
+            setSelectedJobId(convertedJobs[0].id);
+            setView('CUSTOMER_STATUS');
+          } else {
+            setView('CUSTOMER_HISTORY');
+          }
+          return;
+        }
+      } catch (error) {
+        console.log('Backend search failed, checking local:', error);
+      }
+      
+      // Fallback to local search
       const customerJobsList = jobs.filter(j => 
         j.customerPhone.replace(/\s/g, '') === normalizedPhone
       );
+      
+      setIsSearching(false);
       
       if (customerJobsList.length > 0) {
         setSelectedCustomerPhone(normalizedPhone);
@@ -656,6 +707,12 @@ export default function App() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
         <PhoneSearchForm onSearch={handlePhoneSearch} />
+        {isSearching && (
+          <div className="mt-4 flex items-center gap-2 text-gray-600">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="font-mono text-sm">Searching...</span>
+          </div>
+        )}
       </div>
     );
   };
