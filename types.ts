@@ -20,6 +20,7 @@ export interface LogEntry {
 
 export interface Job {
   id: string;
+  backendId?: number; // ID from SQLite backend for syncing
   customerName: string;
   customerPhone: string;
   motorcycleModel: string;

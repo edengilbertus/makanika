@@ -4,13 +4,13 @@
 // Configuration - Replace with your actual values from Meta Developer Dashboard
 const WHATSAPP_CONFIG = {
   // Paste your generated access token here
-  accessToken: 'PASTE_YOUR_LONG_TOKEN_HERE',
+  accessToken: 'EAAWGbAEPGlYBQLsa7BzFjwpJWLd9i4Kk7ZAbZBuBMm3ccmdex9yv5ZCWiKZCLwoG0A4mp9Da8etMXf59NWuTxMnYpSQ3npJLQzMBWXcAXQrZA9pzD7YhYdkM8AHz8JKqE5F9aUIUpoWYT9JSqj7GiVn9HpMJqwMgWqP6xrgNLyT7OlRZBVgjvedAZB1OpIb6ZB4EjhaONd0ppTZAZBuCyWhxKYvh4iP274hE9zTjyRkIpHzWzRpw3FPdbrIm1v5P0H0N9Ue0Xs5IwihbZCDB3v7kdAQ',
   
   // Phone Number ID from your Meta dashboard
   phoneNumberId: '941269635726401',
   
   // API version
-  apiVersion: 'v18.0',
+  apiVersion: 'v22.0',
   
   // Test number for wa.me links (without + sign)
   testNumber: '15556225015'

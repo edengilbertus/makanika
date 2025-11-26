@@ -321,3 +321,124 @@ export const rolesAPI = {
 
 // Export API base URL for reference
 export { API_BASE_URL };
+
+// ==================== JOBS API ====================
+
+export interface JobCreate {
+  customer_name: string;
+  customer_phone: string;
+  customer_email?: string | null;
+  vehicle_name: string;
+  motorcycle_numberplate: string;
+  problem_description: string;
+  estimated_cost?: number;
+  priority?: number; // 1-4
+  create_customer_account?: boolean;
+}
+
+export interface JobUpdate {
+  status?: string;
+  problem_description?: string;
+  estimated_cost?: number;
+  priority?: number;
+}
+
+export interface JobResponse {
+  id: number;
+  customer_name: string;
+  customer_phone: string;
+  motorcycle_model: string;
+  plate_number: string;
+  issue_type: string;
+  issue_description: string;
+  status: string;
+  estimated_cost: number;
+  estimated_pickup: string;
+  entry_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LogEntryCreate {
+  message: string;
+}
+
+export interface CostItemCreate {
+  description: string;
+  amount: number;
+}
+
+export const jobsAPI = {
+  // Get all jobs
+  async getAll(skip = 0, limit = 100): Promise<JobResponse[]> {
+    return apiRequest<JobResponse[]>(`/api/v1/jobs/?skip=${skip}&limit=${limit}`);
+  },
+
+  // Get job by ID
+  async getById(id: number): Promise<JobResponse> {
+    return apiRequest<JobResponse>(`/api/v1/jobs/${id}`);
+  },
+
+  // Get jobs by customer phone
+  async getByPhone(phone: string): Promise<JobResponse[]> {
+    return apiRequest<JobResponse[]>(`/api/v1/jobs/search/by-phone?phone=${encodeURIComponent(phone)}`);
+  },
+
+  // Get job by job number
+  async getByNumber(jobNumber: string): Promise<JobResponse> {
+    return apiRequest<JobResponse>(`/api/v1/jobs/number/${jobNumber}`);
+  },
+
+  // Create new job
+  async create(data: JobCreate): Promise<JobResponse> {
+    return apiRequest<JobResponse>('/api/v1/jobs/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Update job
+  async update(id: number, data: JobUpdate): Promise<JobResponse> {
+    return apiRequest<JobResponse>(`/api/v1/jobs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Update job status
+  async updateStatus(id: number, status: string): Promise<JobResponse> {
+    return apiRequest<JobResponse>(`/api/v1/jobs/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  // Update job cost
+  async updateCost(id: number, amount: number): Promise<JobResponse> {
+    return apiRequest<JobResponse>(`/api/v1/jobs/${id}/cost`, {
+      method: 'PATCH',
+      body: JSON.stringify({ estimated_cost: amount }),
+    });
+  },
+
+  // Assign mechanic to job
+  async assignMechanic(id: number, mechanicId: number): Promise<JobResponse> {
+    return apiRequest<JobResponse>(`/api/v1/jobs/${id}/assign`, {
+      method: 'PATCH',
+      body: JSON.stringify({ mechanic_id: mechanicId }),
+    });
+  },
+
+  // Get job stats summary
+  async getStats(): Promise<any> {
+    return apiRequest<any>('/api/v1/jobs/stats/summary');
+  },
+
+  // Get current customer's jobs
+  async getMyJobs(): Promise<JobResponse[]> {
+    return apiRequest<JobResponse[]>('/api/v1/jobs/customer/my-jobs');
+  },
+};
+
+// Note: Customers are managed as part of Jobs in the backend
+// No separate customers API needed

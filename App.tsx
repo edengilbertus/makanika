@@ -8,7 +8,7 @@ import { StatusBadge } from './components/StatusBadge';
 import { LoginForm, RegisterForm } from './components/AuthForms';
 import { CostForm, LogForm, NewJobFormFields, PhoneSearchForm } from './components/JobDetailForms';
 import { useAuth } from './contexts/AuthContext';
-import { sparePartsAPI } from './services/api';
+import { sparePartsAPI, jobsAPI } from './services/api';
 import { 
   sendJobNotification, 
   sendWhatsAppMessage as sendWhatsAppCloudMessage,
@@ -197,7 +197,7 @@ export default function App() {
     window.open(whatsappUrl, '_blank');
   };
 
-  // Send via Cloud API if configured, otherwise use wa.me link
+  // Send WhatsApp notification - tries Cloud API first, falls back to wa.me
   const sendWhatsAppNotification = async (phone: string, message: string, jobId: string) => {
     // Log the notification
     const notification: SMSNotification = {
@@ -209,18 +209,17 @@ export default function App() {
     };
     setSmsNotifications(prev => [notification, ...prev]);
 
-    // Try Cloud API first if configured
+    // Try Cloud API first (works for verified numbers)
     if (isWhatsAppConfigured()) {
       const result = await sendWhatsAppCloudMessage(phone, message);
       if (result.success) {
-        console.log('✅ WhatsApp message sent via Cloud API:', result.messageId);
-        return;
-      } else {
-        console.warn('⚠️ Cloud API failed, falling back to wa.me:', result.error);
+        console.log('✅ WhatsApp sent via Cloud API:', result.messageId);
+        return; // Success! No need for fallback
       }
+      console.warn('⚠️ Cloud API failed, using wa.me link:', result.error);
     }
     
-    // Fallback to wa.me link
+    // Fallback to wa.me link (works with ANY number)
     sendWhatsAppMessage(phone, message);
   };
 
@@ -260,11 +259,22 @@ export default function App() {
 
   // --- Actions ---
 
-  const handleUpdateStatus = (jobId: string, newStatus: JobStatus) => {
+  const handleUpdateStatus = async (jobId: string, newStatus: JobStatus) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
 
+    // Update locally first
     setJobs(jobs.map(j => j.id === jobId ? { ...j, status: newStatus } : j));
+    
+    // Sync to backend if authenticated
+    if (isAuthenticated && job.backendId) {
+      try {
+        await jobsAPI.updateStatus(job.backendId, newStatus);
+        console.log('✅ Status synced to backend');
+      } catch (error) {
+        console.warn('⚠️ Failed to sync status to backend:', error);
+      }
+    }
     
     // Send SMS notification based on status change
     let message = '';
@@ -290,22 +300,37 @@ export default function App() {
     }
   };
 
-  const handleAddLog = (jobId: string, message: string) => {
+  const handleAddLog = async (jobId: string, message: string) => {
     const newLog: LogEntry = {
       id: Date.now().toString(),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
       message
     };
     setJobs(jobs.map(j => j.id === jobId ? { ...j, logs: [newLog, ...j.logs] } : j));
+    // Note: Logs are stored locally - backend syncs job status only
   };
 
-  const handleAddCost = (jobId: string, description: string, amount: number) => {
+  const handleAddCost = async (jobId: string, description: string, amount: number) => {
+    const job = jobs.find(j => j.id === jobId);
     const newCost: CostItem = {
       id: Date.now().toString(),
       description,
       amount
     };
-    setJobs(jobs.map(j => j.id === jobId ? { ...j, costItems: [...j.costItems, newCost] } : j));
+    const updatedCostItems = [...(job?.costItems || []), newCost];
+    const newTotal = updatedCostItems.reduce((sum, item) => sum + item.amount, 0);
+    
+    setJobs(jobs.map(j => j.id === jobId ? { ...j, costItems: updatedCostItems } : j));
+    
+    // Sync total cost to backend
+    if (isAuthenticated && job?.backendId) {
+      try {
+        await jobsAPI.updateCost(job.backendId, newTotal);
+        console.log('✅ Cost synced to backend');
+      } catch (error) {
+        console.warn('⚠️ Failed to sync cost to backend:', error);
+      }
+    }
   };
 
   const copyTrackingLink = (jobId: string) => {
@@ -995,7 +1020,7 @@ export default function App() {
   };
 
   const NewJobForm = () => {
-    const handleFormSubmit = (formData: any) => {
+    const handleFormSubmit = async (formData: any) => {
       // Create job with form data
       const newJob: Job = {
         id: Date.now().toString(),
@@ -1017,6 +1042,25 @@ export default function App() {
         }],
         visuals: []
       };
+
+      // Sync to backend first if authenticated
+      if (isAuthenticated) {
+        try {
+          const backendJob = await jobsAPI.create({
+            customer_name: newJob.customerName,
+            customer_phone: newJob.customerPhone,
+            vehicle_name: newJob.motorcycleModel,
+            motorcycle_numberplate: newJob.plateNumber,
+            problem_description: `${newJob.issueType}: ${newJob.issueDescription}`,
+            estimated_cost: newJob.estimatedCost,
+            create_customer_account: true,
+          });
+          newJob.backendId = backendJob.id;
+          console.log('✅ Job synced to backend, ID:', backendJob.id);
+        } catch (error) {
+          console.warn('⚠️ Failed to sync job to backend:', error);
+        }
+      }
 
       setJobs([newJob, ...jobs]);
 
