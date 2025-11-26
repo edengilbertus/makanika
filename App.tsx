@@ -9,6 +9,12 @@ import { LoginForm, RegisterForm } from './components/AuthForms';
 import { CostForm, LogForm, NewJobFormFields, PhoneSearchForm } from './components/JobDetailForms';
 import { useAuth } from './contexts/AuthContext';
 import { sparePartsAPI } from './services/api';
+import { 
+  sendJobNotification, 
+  sendWhatsAppMessage as sendWhatsAppCloudMessage,
+  isWhatsAppConfigured,
+  getVerificationLink 
+} from './services/whatsapp';
 
 // LocalStorage keys
 const STORAGE_KEYS = {
@@ -183,7 +189,7 @@ export default function App() {
     return cleaned;
   };
 
-  // Open WhatsApp with message
+  // Open WhatsApp with message (wa.me fallback)
   const sendWhatsAppMessage = (phone: string, message: string) => {
     const formattedPhone = formatPhoneForWhatsApp(phone);
     const encodedMessage = encodeURIComponent(message);
@@ -191,8 +197,9 @@ export default function App() {
     window.open(whatsappUrl, '_blank');
   };
 
-  // Log notification and open WhatsApp
-  const sendNotification = useCallback((phone: string, message: string, jobId: string, autoOpen: boolean = false) => {
+  // Send via Cloud API if configured, otherwise use wa.me link
+  const sendWhatsAppNotification = async (phone: string, message: string, jobId: string) => {
+    // Log the notification
     const notification: SMSNotification = {
       id: Date.now().toString(),
       phone,
@@ -201,9 +208,37 @@ export default function App() {
       jobId
     };
     setSmsNotifications(prev => [notification, ...prev]);
+
+    // Try Cloud API first if configured
+    if (isWhatsAppConfigured()) {
+      const result = await sendWhatsAppCloudMessage(phone, message);
+      if (result.success) {
+        console.log('✅ WhatsApp message sent via Cloud API:', result.messageId);
+        return;
+      } else {
+        console.warn('⚠️ Cloud API failed, falling back to wa.me:', result.error);
+      }
+    }
     
+    // Fallback to wa.me link
+    sendWhatsAppMessage(phone, message);
+  };
+
+  // Log notification and open WhatsApp
+  const sendNotification = useCallback((phone: string, message: string, jobId: string, autoOpen: boolean = false) => {
     if (autoOpen) {
-      sendWhatsAppMessage(phone, message);
+      // Use new async function that tries Cloud API first
+      sendWhatsAppNotification(phone, message, jobId);
+    } else {
+      // Just log it without sending
+      const notification: SMSNotification = {
+        id: Date.now().toString(),
+        phone,
+        message,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        jobId
+      };
+      setSmsNotifications(prev => [notification, ...prev]);
     }
   }, []);
 
@@ -450,6 +485,16 @@ export default function App() {
         <span className="font-bold text-sm flex items-center gap-2"><MessageCircle className="w-4 h-4" /> WhatsApp Messages</span>
         <button onClick={() => setShowSMSPanel(false)} className="font-bold">×</button>
       </div>
+      
+      {/* API Status */}
+      <div className={`px-3 py-2 text-xs border-b ${isWhatsAppConfigured() ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+        {isWhatsAppConfigured() ? (
+          <span className="flex items-center gap-1">✅ Cloud API Connected</span>
+        ) : (
+          <span className="flex items-center gap-1">⚠️ Using wa.me links (Configure API in services/whatsapp.ts)</span>
+        )}
+      </div>
+      
       <div className="overflow-y-auto max-h-72">
         {smsNotifications.length === 0 ? (
           <div className="p-4 text-center text-gray-500 text-sm">No messages sent yet</div>
